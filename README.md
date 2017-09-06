@@ -12,4 +12,7 @@ For instance to merge the files xaa xab xac and xad, type:
 
 The file xaa is the merged file after the call.
 
+## Features
+
+Fast in-sito tool for merging splitted files. If something went wrong during the process (e.g. no more disk space available) the program tries to truncate the file back to it's original state.
 
