@@ -1,11 +1,9 @@
 
 /* =============================================================================
  * 
- * Title:       
- * Author:      
- * License:     
- * Description: 
- * 
+ * Title:       unsplit - Binary in-situ file manager
+ * Author:      Felix Niederwanger
+ * License:     MIT License
  * 
  * =============================================================================
  */
@@ -31,9 +29,6 @@ using namespace std;
 
 static size_t buf_size = 16*1024;		// Read-write buffer sizes
 
-static char* read_buffer = NULL;
-static char* write_buffer = NULL;
-
 /** Truncate size
   * If set to value >0, then the cleanup will truncate to this size
   * This is intended to be used, if the program fails to revert the file status
@@ -42,6 +37,7 @@ static ssize_t truncateBytes = -1;
 static string outFile = "";
 static int fd_out = 0;
 static bool verbose = false;
+static bool finished = false;
 
 static void printUsage(char* progname) {
 	cout << "unsplit - A simple in-situ file merger" << endl;
@@ -55,35 +51,18 @@ static void printUsage(char* progname) {
 	cout << "  -f FILE                   Take the next argument as input file" << endl;
 	cout << "  -o FILE                   Write all input FILES to the given output FILE." << endl;
 	cout << "                              This disables the in-situ write" << endl;
+	cout << "  -b BYTES                  Define the buffer size in BYTES" << endl;
 	cout << "        --delete-after      Delete input files after merge" << endl;
 }
 
 static ssize_t merge(const int in, const int out) {
 	ssize_t counter = 0;
 	
-	#if 0
-	ssize_t ret;
-	while( (ret = ::read(in, read_buffer, buf_size)) > 0) {
-		counter += ret;
-		ssize_t s = ::write(out, read_buffer, ret);
-		if(s < 0) {
-			ret = s;
-			break;
-		} else if(s != ret) {
-			cerr << "write bytes (" << s << ") != read bytes (" << ret << ")" << endl;
-		}
-	}
-	// Return error if happening
-	if(ret == 0) return counter;
-	else return ret;
-	#endif
-	
 	loff_t off = 0;
 	while(true) {
 		ssize_t ret = sendfile(out, in, &off, buf_size);
-		//splice(in, &off_in, out, &off_out, buf_size, 0);//SPLICE_F_MORE);
 		if(ret < 0) return ret;		// Error
-		if(ret == 0) break;
+		if(ret == 0) break;			// EOF
 		else 
 			counter += ret;
 	}
@@ -107,9 +86,9 @@ static void revert() {
 }
 
 static void cleanup() {
-	if(read_buffer != NULL) delete[] read_buffer;
-    if(write_buffer != NULL) delete[] write_buffer;
-	revert();
+	if(!finished) {
+		revert();
+	}
 }
 
 static void sig_handler(const int sig_no) {
@@ -136,30 +115,42 @@ int main(int argc, char** argv) {
     bool deleteAfter = false;
     
     // XXX: Replace with getopts
-    for(int i=1;i<argc;i++) {
-    	string arg(argv[i]);
-    	if(arg.size() == 0) continue;
-    	if(arg.at(0) == '-') {
-    		if (arg == "-h" || arg == "--help") {
-    			printUsage(argv[0]);
-    			exit(EXIT_SUCCESS);
-    		} else if (arg == "-f") {
-    			arg = argv[++i];
-    			files.push_back(arg);
-    		} else if (arg == "-o") {
-    			outFile = argv[++i];
-    			inSitu = false;
-    		} else if (arg == "-v" || arg == "--verbose") {
-    			verbose = true;
-    		} else if(arg == "--delete-after") {
-    			deleteAfter = true;
-    		} else {
-    			cerr << "Illegal program argument: " << arg << endl;
-    			exit(EXIT_FAILURE);
-    		}
-    	} else {
-    		files.push_back(arg);
-    	}
+    try {
+		for(int i=1;i<argc;i++) {
+			string arg(argv[i]);
+			if(arg.size() == 0) continue;
+			if(arg.at(0) == '-') {
+				if (arg == "-h" || arg == "--help") {
+					printUsage(argv[0]);
+					exit(EXIT_SUCCESS);
+				} else if (arg == "-b") {
+					if(i>=argc-1) throw "Missing argument: Buffer size";
+					ssize_t size = (ssize_t)::atol(argv[++i]);
+					if(size <= 0) throw "Illegal buffer size";
+					buf_size = size;
+				} else if (arg == "-f") {
+					if(i>=argc-1) throw "Missing argument: File";
+					arg = argv[++i];
+					files.push_back(arg);
+				} else if (arg == "-o") {
+					if(i>=argc-1) throw "Missing argument: Output file";
+					outFile = argv[++i];
+					inSitu = false;
+				} else if (arg == "-v" || arg == "--verbose") {
+					verbose = true;
+				} else if(arg == "--delete-after") {
+					deleteAfter = true;
+				} else {
+					cerr << "Illegal program argument: " << arg << endl;
+					exit(EXIT_FAILURE);
+				}
+			} else {
+				files.push_back(arg);
+			}
+		}
+    } catch (const char* msg) {
+    	cerr << "Error: " << msg << endl;
+    	exit(EXIT_FAILURE);
     }
     
     if(files.size() == 0) {
@@ -173,8 +164,6 @@ int main(int argc, char** argv) {
     	exit(EXIT_SUCCESS);
     }
     
-    read_buffer = new char[buf_size];
-    write_buffer  = new char[buf_size];
     atexit(cleanup);
     signal(SIGINT, sig_handler);
     signal(SIGABRT, sig_handler);
@@ -238,6 +227,7 @@ int main(int argc, char** argv) {
     	
     	// Do not truncate anymore
     	truncateBytes = -1;
+    	finished = true;
     	
     	if(deleteAfter) {
 			for(vector<string>::const_iterator it = files.begin(); it != files.end(); ++it) {
