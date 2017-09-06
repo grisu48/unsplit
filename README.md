@@ -4,6 +4,15 @@ In-situ binary file merger
 
 This is a really simple tool to merge file that have been splitted using the 'split' command. The tools appends all the given files to the first one on-place.
 
+## Build instructions
+
+A simple make should do the job for most systems
+ make
+
+The Makefile is trivial and can be edited easily. For installing the program in the system use
+ sudo make install
+
+
 ## Usage
 
 For instance to merge the files xaa xab xac and xad, type:
