@@ -27,4 +27,4 @@ The file xaa is the merged file after the call.
 
 Fast in-sito tool for merging splitted files. If something went wrong during the process (e.g. no more disk space available) the program tries to truncate the file back to it's original state.
 
-In contrast to the ''cat'' tool that is supposed to be the canonical way of merging files together, this program tries to recover the original file in case something went wrong.
+In contrast to the `cat` tool that is supposed to be the canonical way of merging files together, this program tries to recover the original file in case something went wrong.
