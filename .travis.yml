@@ -9,4 +9,4 @@ language: c
 compiler:
         - gcc
 
-script: make
+script: make && ./test.sh
