@@ -1,5 +1,7 @@
 # unsplit
 
+[![Build Status](https://travis-ci.org/grisu48/unsplit.svg?branch=master)](https://travis-ci.org/grisu48/unsplit)
+
 In-situ binary file merger
 
 This is a really simple tool to merge file that have been splitted using the 'split' command. The tools appends all the given files to the first one on-place.
